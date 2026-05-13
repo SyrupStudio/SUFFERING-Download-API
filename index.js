@@ -1,8 +1,9 @@
 const express = require("express");
 const app = express();
 
+// Ensure these match your GitHub URL exactly
 const REPO_OWNER = "Pan-cakse"; 
-const REPO_NAME = "SUFFERING";
+const REPO_NAME = "SUFFERING"; // Change this if the repo with zips is just "suffering"
 
 app.get("/download", async (req, res) => {
     const targetOs = req.query.os || "windows";
@@ -12,36 +13,41 @@ app.get("/download", async (req, res) => {
         const { Octokit } = await import("@octokit/rest");
         const octokit = new Octokit({ 
             auth: process.env.GH_TOKEN,
-            userAgent: 'suffering-launcher-v1' // GitHub MANDATES a User-Agent
+            userAgent: 'suffering-proxy-v1'
         });
 
-        // 1. Get the latest release
-        const { data: release } = await octokit.repos.getLatestRelease({
+        // 1. Get releases and find the right one
+        const { data: releases } = await octokit.repos.listReleases({
             owner: REPO_OWNER,
             repo: REPO_NAME,
+            per_page: 1
         });
 
-        // 2. Find the asset (Case-insensitive fix)
-        const asset = release.assets.find(a => a.name.toLowerCase().includes(searchQuery.toLowerCase()));
-        if (!asset) return res.status(404).send(`Asset "${searchQuery}" not found in latest release.`);
+        if (!releases.length) return res.status(404).send("No releases found.");
+        const release = releases[0];
 
-        // 3. Get the Download URL instead of the raw data
-        // This is more reliable for Vercel's memory limits
-        const { url } = await octokit.repos.getReleaseAsset({
+        // 2. Find the asset
+        const asset = release.assets.find(a => a.name.toLowerCase().includes(searchQuery.toLowerCase()));
+        if (!asset) return res.status(404).send(`Asset ${searchQuery} not found.`);
+
+        // 3. Request the actual binary data
+        const response = await octokit.repos.getReleaseAsset({
             owner: REPO_OWNER,
             repo: REPO_NAME,
             asset_id: asset.id,
-            headers: { accept: "application/octet-stream" },
-            request: { redirect: 'manual' } // We want the URL, not the file content yet
+            headers: { accept: "application/octet-stream" }
         });
 
-        // 4. Redirect the user to the secure GitHub AWS link
-        // GitHub will provide a temporary signed URL that works even for private repos
-        return res.redirect(url);
+        // 4. Send the data back as a file download
+        res.setHeader("Content-Type", "application/octet-stream");
+        res.setHeader("Content-Disposition", `attachment; filename=${asset.name}`);
+        
+        // Use Buffer.from because Octokit returns the data as an ArrayBuffer in this environment
+        return res.send(Buffer.from(response.data));
 
     } catch (error) {
         console.error(error);
-        res.status(500).send(`GitHub API Error: ${error.message}`);
+        res.status(500).send(`Proxy Error: ${error.message}`);
     }
 });
 
