@@ -1,27 +1,29 @@
-const { Octokit } = require("@octokit/rest");
 const express = require("express");
 const app = express();
 
-const octokit = new Octokit({ auth: process.env.GH_TOKEN });
 const REPO_OWNER = "Pan-cakse";
-const REPO_NAME = "SUFFERING";
+const REPO_NAME = "suffering-api";
 
 app.get("/download", async (req, res) => {
     const targetOs = req.query.os || "windows";
     const searchQuery = `suffering-${targetOs}.zip`;
 
     try {
+        // Fix: Dynamically import Octokit because it is an ES Module
+        const { Octokit } = await import("@octokit/rest");
+        const octokit = new Octokit({ auth: process.env.GH_TOKEN });
+
         // 1. Get the latest release
         const { data: release } = await octokit.repos.getLatestRelease({
             owner: REPO_OWNER,
             repo: REPO_NAME,
         });
 
-        // 2. Find the asset by name
+        // 2. Find the asset
         const asset = release.assets.find(a => a.name.includes(searchQuery));
         if (!asset) return res.status(404).send("Asset not found");
 
-        // 3. Get the actual file data
+        // 3. Get the file
         const { data } = await octokit.repos.getReleaseAsset({
             owner: REPO_OWNER,
             repo: REPO_NAME,
@@ -29,14 +31,13 @@ app.get("/download", async (req, res) => {
             headers: { accept: "application/octet-stream" },
         });
 
-        // 4. Send it to the user
         res.setHeader("Content-Type", "application/zip");
         res.setHeader("Content-Disposition", `attachment; filename=${searchQuery}`);
         return res.send(Buffer.from(data));
 
     } catch (error) {
         console.error(error);
-        res.status(500).send("Internal Server Error");
+        res.status(500).send("Internal Server Error: Check GitHub Token and Permissions");
     }
 });
 
