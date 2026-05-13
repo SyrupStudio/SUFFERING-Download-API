@@ -1,0 +1,24 @@
+{
+  "name": "suffering-api",
+  "version": "1.0.0",
+  "description": "downloads api",
+  "homepage": "https://github.com/Pan-cakse/suffering-api#readme",
+  "bugs": {
+    "url": "https://github.com/Pan-cakse/suffering-api/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Pan-cakse/suffering-api.git"
+  },
+  "license": "ISC",
+  "author": "Pancakse",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@octokit/rest": "^22.0.1",
+    "express": "^5.2.1"
+  }
+}
