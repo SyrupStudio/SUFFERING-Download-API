@@ -2,7 +2,7 @@ const express = require("express");
 const app = express();
 
 const REPO_OWNER = "Pan-cakse"; 
-const REPO_NAME = "suffering-api";
+const REPO_NAME = "SUFFERING";
 
 app.get("/download", async (req, res) => {
     const targetOs = req.query.os || "windows";
