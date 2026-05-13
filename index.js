@@ -1,7 +1,7 @@
 const express = require("express");
 const app = express();
 
-const REPO_OWNER = "Pan-cakse";
+const REPO_OWNER = "Pan-cakse"; 
 const REPO_NAME = "suffering-api";
 
 app.get("/download", async (req, res) => {
@@ -9,9 +9,11 @@ app.get("/download", async (req, res) => {
     const searchQuery = `suffering-${targetOs}.zip`;
 
     try {
-        // Fix: Dynamically import Octokit because it is an ES Module
         const { Octokit } = await import("@octokit/rest");
-        const octokit = new Octokit({ auth: process.env.GH_TOKEN });
+        const octokit = new Octokit({ 
+            auth: process.env.GH_TOKEN,
+            userAgent: 'suffering-launcher-v1' // GitHub MANDATES a User-Agent
+        });
 
         // 1. Get the latest release
         const { data: release } = await octokit.repos.getLatestRelease({
@@ -19,25 +21,27 @@ app.get("/download", async (req, res) => {
             repo: REPO_NAME,
         });
 
-        // 2. Find the asset
-        const asset = release.assets.find(a => a.name.includes(searchQuery));
-        if (!asset) return res.status(404).send("Asset not found");
+        // 2. Find the asset (Case-insensitive fix)
+        const asset = release.assets.find(a => a.name.toLowerCase().includes(searchQuery.toLowerCase()));
+        if (!asset) return res.status(404).send(`Asset "${searchQuery}" not found in latest release.`);
 
-        // 3. Get the file
-        const { data } = await octokit.repos.getReleaseAsset({
+        // 3. Get the Download URL instead of the raw data
+        // This is more reliable for Vercel's memory limits
+        const { url } = await octokit.repos.getReleaseAsset({
             owner: REPO_OWNER,
             repo: REPO_NAME,
             asset_id: asset.id,
             headers: { accept: "application/octet-stream" },
+            request: { redirect: 'manual' } // We want the URL, not the file content yet
         });
 
-        res.setHeader("Content-Type", "application/zip");
-        res.setHeader("Content-Disposition", `attachment; filename=${searchQuery}`);
-        return res.send(Buffer.from(data));
+        // 4. Redirect the user to the secure GitHub AWS link
+        // GitHub will provide a temporary signed URL that works even for private repos
+        return res.redirect(url);
 
     } catch (error) {
         console.error(error);
-        res.status(500).send("Internal Server Error: Check GitHub Token and Permissions");
+        res.status(500).send(`GitHub API Error: ${error.message}`);
     }
 });
 
