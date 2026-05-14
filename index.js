@@ -51,6 +51,29 @@ app.get("/download", async (req, res) => {
     }
 });
 
+app.get("/versions", async (req, res) => {
+    try {
+        const { Octokit } = await import("@octokit/rest");
+        const octokit = new Octokit({ auth: process.env.GH_TOKEN });
+
+        const { data: releases } = await octokit.repos.listReleases({
+            owner: REPO_OWNER,
+            repo: REPO_NAME,
+        });
+
+        // Return a list of version tags and their release notes
+        const versionList = releases.map(r => ({
+            tag: r.tag_name,
+            name: r.name,
+            date: r.published_at
+        }));
+
+        res.json(versionList);
+    } catch (error) {
+        res.status(500).send(error.message);
+    }
+});
+
 // Specific Forbidden Route
 app.get("/forbidden", (req, res) => {
     res.status(403).send(`
