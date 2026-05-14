@@ -1,74 +1,87 @@
 const express = require("express");
 const app = express();
 
-// Ensure these match your GitHub URL exactly
 const REPO_OWNER = "Pan-cakse"; 
-const REPO_NAME = "SUFFERING"; // Change this if the repo with zips is just "suffering"
+const REPO_NAME = "SUFFERING"; // Ensure this matches the repo with the Zips!
 
 app.get("/download", async (req, res) => {
     const targetOs = req.query.os || "windows";
-    const searchQuery = `suffering-${targetOs}.zip`;
+    const requestedTag = req.query.version; // The Go launcher will send this
+    const searchQuery = `suffering-${targetOs.toLowerCase()}.zip`;
 
     try {
         const { Octokit } = await import("@octokit/rest");
         const octokit = new Octokit({ 
             auth: process.env.GH_TOKEN,
-            userAgent: 'suffering-proxy-v1'
+            userAgent: 'suffering-launcher-go'
         });
 
-        // 1. Get releases and find the right one
-        const { data: releases } = await octokit.repos.listReleases({
-            owner: REPO_OWNER,
-            repo: REPO_NAME,
-            per_page: 1
-        });
+        let release;
 
-        if (!releases.length) return res.status(404).send("No releases found.");
-        const release = releases[0];
+        if (requestedTag) {
+            // 1a. User wants a specific version (Profile selection)
+            const { data } = await octokit.repos.getReleaseByTag({
+                owner: REPO_OWNER,
+                repo: REPO_NAME,
+                tag: requestedTag,
+            });
+            release = data;
+        } else {
+            // 1b. Default to the most recent release (the "main" button)
+            const { data: releases } = await octokit.repos.listReleases({
+                owner: REPO_OWNER,
+                repo: REPO_NAME,
+                per_page: 1,
+            });
+            if (!releases.length) throw new Error("No releases found.");
+            release = releases[0];
+        }
 
-        // 2. Find the asset
-        const asset = release.assets.find(a => a.name.toLowerCase().includes(searchQuery.toLowerCase()));
-        if (!asset) return res.status(404).send(`Asset ${searchQuery} not found.`);
+        // 2. Find the correct asset (.zip) in that release
+        const asset = release.assets.find(a => 
+            a.name.toLowerCase().includes(searchQuery)
+        );
 
-        // 3. Request the actual binary data
+        if (!asset) {
+            return res.status(404).send(`Asset "${searchQuery}" not found in version ${release.tag_name}.`);
+        }
+
+        // 3. Fetch the actual file data from GitHub
         const response = await octokit.repos.getReleaseAsset({
             owner: REPO_OWNER,
             repo: REPO_NAME,
             asset_id: asset.id,
-            headers: { accept: "application/octet-stream" }
+            headers: { accept: "application/octet-stream" },
         });
 
-        // 4. Send the data back as a file download
+        // 4. Proxy the data back to the Go Launcher
         res.setHeader("Content-Type", "application/octet-stream");
         res.setHeader("Content-Disposition", `attachment; filename=${asset.name}`);
         
-        // Use Buffer.from because Octokit returns the data as an ArrayBuffer in this environment
+        // Octokit returns an ArrayBuffer in this environment, so we wrap it in a Buffer
         return res.send(Buffer.from(response.data));
 
     } catch (error) {
         console.error(error);
-        res.status(500).send(`Proxy Error: ${error.message}`);
+        res.status(500).send(`GitHub Proxy Error: ${error.message}`);
     }
 });
 
+// Handy helper for your Go launcher to populate the version dropdown
 app.get("/versions", async (req, res) => {
     try {
         const { Octokit } = await import("@octokit/rest");
         const octokit = new Octokit({ auth: process.env.GH_TOKEN });
-
         const { data: releases } = await octokit.repos.listReleases({
             owner: REPO_OWNER,
             repo: REPO_NAME,
         });
 
-        // Return a list of version tags and their release notes
-        const versionList = releases.map(r => ({
+        res.json(releases.map(r => ({
             tag: r.tag_name,
             name: r.name,
-            date: r.published_at
-        }));
-
-        res.json(versionList);
+            published: r.published_at
+        })));
     } catch (error) {
         res.status(500).send(error.message);
     }
