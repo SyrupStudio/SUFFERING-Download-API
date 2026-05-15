@@ -2,8 +2,7 @@ const express = require("express");
 const app = express();
 
 // --- CONFIGURATION ---
-// Ensure these match your GitHub URLs exactly!
-const GAME_REPO = { owner: "Pan-cakse", repo: "SUFFERING" };
+const GAME_REPO = { owner: "Pan-cakse", repo: "suffering" };
 const LAUNCHER_REPO = { owner: "Pan-cakse", repo: "SUFFERING-Launcher" };
 
 // --- HELPERS ---
@@ -15,9 +14,99 @@ const getOctokit = async () => {
     });
 };
 
+// --- SWAGGER JSON SPECIFICATION ---
+const swaggerDocument = {
+    openapi: "3.0.0",
+    info: {
+        title: "SUFFERING Distribution API",
+        version: "1.0.0",
+        description: "API for managing launcher updates and private game downloads bridged securely from GitHub."
+    },
+    paths: {
+        "/versions": {
+            get: {
+                summary: "Get available game versions",
+                description: "Returns a list of all compiled game release tags for profile configuration.",
+                responses: { 200: { description: "Success" } }
+            }
+        },
+        "/download": {
+            get: {
+                summary: "Download game bundle",
+                description: "Proxies binary zip files directly from the private GitHub repository based on selected OS.",
+                parameters: [
+                    { name: "os", in: "query", schema: { type: "string", default: "windows" }, description: "Target operating system (windows, linux, macos)" },
+                    { name: "version", in: "query", schema: { type: "string" }, description: "Specific release tag name (Defaults to latest if omitted)" }
+                ],
+                responses: { 200: { description: "Returns file application/octet-stream" } }
+            }
+        },
+        "/launcher/check": {
+            get: {
+                summary: "Check for launcher updates",
+                description: "Compares current client version tag against the latest automated compilation.",
+                parameters: [
+                    { name: "v", in: "query", required: true, schema: { type: "string" }, description: "Current launcher commit/version hash" }
+                ],
+                responses: { 200: { description: "Success JSON payload detailing update status" } }
+            }
+        },
+        "/launcher/download": {
+            get: {
+                summary: "Download launcher installer",
+                description: "Proxies the latest installer file (.msi or .dmg) depending on platform selection.",
+                parameters: [
+                    { name: "os", in: "query", schema: { type: "string", default: "exe" }, description: "Set 'exe' for Windows installer (.msi) or 'dmg' for macOS" }
+                ],
+                responses: { 200: { description: "Returns installer file application/octet-stream" } }
+            }
+        }
+    }
+};
+
+// --- SWAGGER UI ROUTE ---
+app.get("/docs", (req, res) => {
+    res.send(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <title>SUFFERING API Docs</title>
+            <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.18.3/swagger-ui.css" />
+            <style>
+                html { box-sizing: border-box; overflow: -srv-hidden; }
+                body { margin:0; background: #fafafa; }
+            </style>
+        </head>
+        <body>
+            <div id="swagger-ui"></div>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.18.3/swagger-ui-bundle.js"></script>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.18.3/swagger-ui-standalone-preset.js"></script>
+            <script>
+                window.onload = function() {
+                    const ui = SwaggerUIBundle({
+                        spec: ${JSON.stringify(swaggerDocument)},
+                        dom_id: '#swagger-ui',
+                        deepLinking: true,
+                        presets: [
+                            SwaggerUIBundle.presets.apis,
+                            SwaggerUIStandalonePreset
+                        ],
+                        plugins: [
+                            SwaggerUIBundle.plugins.DownloadUrl
+                        ],
+                        layout: "BaseLayout"
+                    });
+                    window.ui = ui;
+                };
+            </script>
+        </body>
+        </html>
+    `);
+});
+
 // --- 1. GAME DOWNLOADS & VERSIONS ---
 
-// Fetches the list of all game versions for your dropdown
 app.get("/versions", async (req, res) => {
     try {
         const octokit = await getOctokit();
@@ -32,7 +121,6 @@ app.get("/versions", async (req, res) => {
     }
 });
 
-// Proxies the game zip directly to the launcher
 app.get("/download", async (req, res) => {
     const targetOs = (req.query.os || "windows").toLowerCase();
     const requestedTag = req.query.version;
@@ -71,7 +159,6 @@ app.get("/download", async (req, res) => {
 
 // --- 2. LAUNCHER UPDATES ---
 
-// Returns if there is a new launcher version available
 app.get("/launcher/check", async (req, res) => {
     const currentVersion = req.query.v; 
     try {
@@ -90,7 +177,6 @@ app.get("/launcher/check", async (req, res) => {
     }
 });
 
-// Downloads the launcher installer (.msi for Windows, .dmg for Mac)
 app.get("/launcher/download", async (req, res) => {
     const platform = (req.query.os || "exe").toLowerCase();
     const extension = platform === "exe" ? ".msi" : ".dmg"; 
