@@ -121,6 +121,20 @@ app.get("/versions", async (req, res) => {
     }
 });
 
+app.get("/launcher/versions", async (req, res) => {
+    try {
+        const octokit = await getOctokit();
+        const { data: releases } = await octokit.repos.listReleases(LAUNCHER_REPO);
+        res.json(releases.map(r => ({
+            tag: r.tag_name,
+            name: r.name,
+            published: r.published_at
+        })));
+    } catch (error) {
+        res.status(500).send(`Error fetching versions: ${error.message}`);
+    }
+});
+
 app.get("/download", async (req, res) => {
     const targetOs = (req.query.os || "windows").toLowerCase();
     const requestedTag = req.query.version;
