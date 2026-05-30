@@ -1,3 +1,3 @@
 # suffering-api
-its the api wahtelse lol
-dsfsdsss
+
+## THIS IS NOT OPEN SOURCE IT IS SOURCE AVAILBLE!!!!!!
