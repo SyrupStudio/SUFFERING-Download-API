@@ -35,7 +35,7 @@ const swaggerDocument = {
                 summary: "Download game bundle",
                 description: "Proxies binary zip files directly from the private GitHub repository based on selected OS.",
                 parameters: [
-                    { name: "os", in: "query", schema: { type: "string", default: "windows" }, description: "Target operating system (windows, linux, macos)" },
+                    { name: "os", in: "query", schema: { type: "string", default: "windows" }, description: "Target operating system (Windows, Linux, macOS)" },
                     { name: "version", in: "query", schema: { type: "string" }, description: "Specific release tag name (Defaults to latest if omitted)" }
                 ],
                 responses: { 200: { description: "Returns file application/octet-stream" } }
