@@ -2,7 +2,7 @@ const express = require("express");
 const app = express();
 
 // --- CONFIGURATION ---
-const GAME_REPO = { owner: "Pan-cakse", repo: "suffering" };
+const GAME_REPO = { owner: "SyrupStudio", repo: "SUFFERING" };
 const LAUNCHER_REPO = { owner: "Pan-cakse", repo: "SUFFERING-Launcher" };
 
 // --- HELPERS ---
